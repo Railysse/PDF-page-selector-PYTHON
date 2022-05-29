@@ -3,6 +3,64 @@ import PyPDF2
 from tkinter import *
 from os import walk
 
+class Parameters:
+    first_time = True #will be set to false after a file is selected for the first time
+    lower = None #lower bound of the range
+    upper = None #upper bound of the range
+    lower_filled = False 
+    upper_filled = False
+    extra_pages = set() #additional pages
+    all_pages = [] #all pages that will be exported
+    filename = "" #address of the input file
+    directory = "" #address of the output folder
+    
+    @classmethod
+    def first_select(cls):
+        cls.first_time = False
+
+    @classmethod
+    def set_lower(cls, value):
+        cls.lower = value
+
+    @classmethod
+    def set_upper(cls, value):
+        cls.upper = value
+
+    @classmethod
+    def lower_fill(cls, value):
+        cls.lower_filled = value
+    
+    @classmethod
+    def upper_fill(cls, value):
+        cls.upper_filled = value
+        
+    @classmethod
+    def clear_extra(cls):
+        cls.extra_pages.clear()
+
+    @classmethod
+    def add_extra(cls, value):
+        cls.extra_pages.add(int(value))
+
+    @classmethod
+    def remove_extra(cls, value):
+        cls.extra_pages.remove(int(value))
+
+    @classmethod
+    def set_all_pages(cls, value):
+        cls.all_pages = value
+
+    @classmethod
+    def set_filename(cls, value):
+        cls.filename = value
+
+    @classmethod
+    def set_directory(cls, value):
+        cls.directory = value
+
+    @classmethod
+    def range_filled(cls):
+        return cls.lower_filled and cls.upper_filled
 
 def combine_pages(span, extra): #combines the range with the extra pages into a single list
     before = [] 
@@ -16,24 +74,18 @@ def combine_pages(span, extra): #combines the range with the extra pages into a 
     after.sort()
     return before + span + after
 
-#GUI
-
-first_time = True #first time you select a file
-
 def select_file(): 
-    global first_time
-    global button_pdf
     selected = filedialog.askopenfilename(title="Select a PDF file", filetypes=[("PDF files", "*.pdf")])
     if len(selected) > 0:
-        window.filename = selected
-        button_pdf["text"] = window.filename
-        button_pdf["fg"] = "#000000"
+        Parameters.filename = selected 
+        button_pdf.config(text=Parameters.filename)
+        button_pdf.config(fg="#000000")
         
         with open(selected, "rb") as temp:
             content = PyPDF2.PdfFileReader(temp)
             label_pages.config(text="Number of pages: " + str(content.numPages))
-        if first_time: #make sure we're not adding a widget on top of another widget
-                first_time = False
+        if Parameters.first_time: #make sure we're not adding a widget on top of another widget
+                Parameters.first_select()
                 check_same_folder.grid(row=4, column=5)
                 label_same_folder.grid(row=4, column=6, sticky = W)
                 label_pages.grid(row=2, column=5, columnspan=2)
@@ -44,123 +96,102 @@ def select_file():
         if check.get() == 1: #if the tick box is checked, update the folder button to match
             folder = selected.split("/")[0:-1]
             folder = "/".join(folder)
-            window.directory = folder
-            button_folder.config(text=folder)
-            
-        
+            Parameters.directory = folder
+            button_folder.config(text=folder)         
 
 def select_folder():
     selected = filedialog.askdirectory(title="Select a folder for the output")
     if len(selected) > 0: 
-        window.directory = selected
-        global button_folder
-        button_folder.config(text=window.directory, fg="#000000")
-
+        Parameters.directory = selected
+        button_folder.config(text=Parameters.directory, fg="#000000")
 
 def check_changed():
     if check.get() == 1:
         button_folder['state'] = DISABLED
-        excess = window.filename.split("/") #split the input address by /
+        excess = Parameters.filename.split("/") #split the input address by /
         excess = len(excess[-1]) + 1 #take the length of the namefile +1 to account for the / symbol
-        window.directory = window.filename[0:len(window.filename) - excess] #the folder component of the address
-        button_folder.config(text=window.directory)
+        Parameters.directory = Parameters.filename[0:len(Parameters.filename) - excess] #the folder component of the address
+        button_folder.config(text=Parameters.directory)
     else:
         button_folder.config(state=NORMAL, fg="#000000")
-        
-lower_filled = False
-upper_filled = False
 
 def lower_callback(a, b, c):
-    global lower_filled
-    if len(lwr.get()) > 0:
-        if lwr.get() == "0":
+    if len(lower_text.get()) > 0:
+        if lower_text.get() == "0":
             entry_lower.delete(0, END) #page 0 is not allowed
         else:
-            char = lwr.get()[-1]
+            char = lower_text.get()[-1]
             if not ("0" <= char and char <="9"): #check if the latest input is an interger
-                temp = lwr.get()[:-1]
+                temp = lower_text.get()[:-1]
                 entry_lower.delete(0, END) 
                 entry_lower.insert(0, temp) #if not, delete it
             else:
-                lower_filled = True
+                Parameters.lower_fill(True)
     else:
-        lower_filled = False
-    global lower_bound
-    lower_bound = lwr.get()
-    if lower_filled and upper_filled:
+        Parameters.lower_fill(False)
+    Parameters.set_lower(lower_text.get())
+    if Parameters.range_filled():
         show_summary_range()
     else:
         label_range_info.config(text="")        
 
 def upper_callback(a, b, c):
-    global upper_filled
-    if len(upr.get()) > 0:
-        if upr.get() == "0":
+    if len(upper_text.get()) > 0:
+        if upper_text.get() == "0":
             entry_upper.delete(0, END) #page 0 not allowed
         else:
-            char = upr.get()[-1]
+            char = upper_text.get()[-1]
             if not ("0" <= char and char <="9"): #check if the latest input is an interger
-                temp = upr.get()[:-1]
+                temp = upper_text.get()[:-1]
                 entry_upper.delete(0, END)
                 entry_upper.insert(0, temp) #if not, delete it
             else:
-                upper_filled = True
+                Parameters.upper_fill(True)
     else:
-        upper_filled = False
-    global upper_bound
-    upper_bound = upr.get()
-    if lower_filled and upper_filled:
+        Parameters.upper_fill(False)
+    Parameters.set_upper(upper_text.get())
+    if Parameters.range_filled():
         show_summary_range()
     else:
         label_range_info.config(text="")
-
 
 def show_summary_range():
     a = int(entry_lower.get())
     b = int(entry_upper.get())
     label_range_info.config(text="All pages between " + str(min(a, b)) + " and " + str(max(a, b)) + ".")
 
-
-
 def extra_callback(a, b, c):
-    if len(extr.get()) > 0:
-        if extr.get() == "0":
+    if len(extra_text.get()) > 0:
+        if extra_text.get() == "0":
             entry_extra_pages.delete(0,END) #page 0 not allowed
         else:
-            char = extr.get()[-1]
+            char = extra_text.get()[-1]
             if not char.isdigit():
-                temp = extr.get()[0:-1]
+                temp = extra_text.get()[0:-1]
                 entry_extra_pages.delete(0,END)
                 entry_extra_pages.insert(0,temp)
 
-
-extra_pages_set = set() #make a set of extra pages, contains integers
 def pageadd(*args): #needs argument when the enter key calls it
-    global extra_pages_set
     if len(entry_extra_pages.get()) > 0:
-        extra_pages_set.add(int(entry_extra_pages.get())) #add the element in the entry box to the set
+        Parameters.add_extra(entry_extra_pages.get()) #add the element in the entry box to the set
         entry_extra_pages.delete(0, END)
         summary()
         
 def pageremove():
-    global extra_pages_set
-    global extra_filled
-    extra_filled = False
     temp = entry_extra_pages.get()
     if len(temp) > 0:
-        if int(temp) in extra_pages_set:
-            extra_pages_set.remove(int(entry_extra_pages.get())) #remove the element in the entry box from the set
+        if int(temp) in Parameters.extra_pages:
+            Parameters.remove_extra(entry_extra_pages.get()) #remove the element in the entry box from the set
             entry_extra_pages.delete(0, END)
             summary()
 
 def pageclear():
-    global extra_pages_set
-    extra_pages_set = set()
+    Parameters.clear_extra()
     summary()
 
 def summary():
-    if len(extra_pages_set) > 0:
-        sorted = list(extra_pages_set)
+    if len(Parameters.extra_pages) > 0:
+        sorted = list(Parameters.extra_pages)
         sorted.sort()
         temp = ", ".join([str(i) for i in sorted])
         label_pages_added.config(text=temp)
@@ -168,25 +199,25 @@ def summary():
         label_pages_added.config(text="-")
 
 def create_file_name(iteration):
-    address = window.filename.split("/")
+    address = Parameters.filename.split("/")
     filename = address[-1] #filename plus extension
     filename = filename.split(".")[0] #extract the filename with no extension
     files = []
-    for (dirpath, dirnames, filenames) in walk(window.directory):
+    for (dirpath, dirnames, filenames) in walk(Parameters.directory):
         files.extend(filenames)
         break
     if filename + "_trimmed.pdf" in files:
         if filename + "_trimmed(" + str(iteration) + ").pdf" in files:
             return create_file_name(iteration + 1)
         else:
-            output = window.directory + "/" + filename + "_trimmed(" + str(iteration) + ").pdf"
+            output = Parameters.directory + "/" + filename + "_trimmed(" + str(iteration) + ").pdf"
             return output
     else:      
-        output = window.directory + "/" + filename + "_trimmed.pdf"
+        output = Parameters.directory + "/" + filename + "_trimmed.pdf"
         return output
 
 def make_pdf(all_pages):
-    file = open(window.filename, 'rb')
+    file = open(Parameters.filename, 'rb')
     reader = PyPDF2.PdfFileReader(file)
     writer = PyPDF2.PdfFileWriter()
     number_pages = 0
@@ -211,29 +242,25 @@ def make_pdf(all_pages):
         label_export.config(text="The file doesn't contain any selected page", fg="#C23033")
         label_export_result.config(text="")
 
-all_pages = []
 def export():
-    global all_pages
-    filled_pages = (lower_filled and upper_filled) or (len(extra_pages_set) > 0)
-    filled_file = len(window.filename) > 0
-    filled_folder = len(window.directory) > 0
+    label_export_result.config(text="")
+    filled_pages = (Parameters.range_filled()) or (len(Parameters.extra_pages) > 0)
+    filled_file = len(Parameters.filename) > 0
+    filled_folder = len(Parameters.directory) > 0
     value = filled_pages and filled_file and filled_folder
     if value:
         label_export.config(text="Exporting...", fg="#3F3F3F")
-        global lower_bound
-        global upper_bound
+        additional_pages = list(Parameters.extra_pages)
+        additional_pages = [i-1 for i in additional_pages] #take the index offset into account
         try: #if lower and upper bound are specified do this
-            lower = int(lower_bound)
-            upper = int(upper_bound)
+            lower = int(Parameters.lower)
+            upper = int(Parameters.upper)
             region = list(range(min(lower, upper)-1, max(lower, upper)))
-            additional_pages = list(extra_pages_set)
-            additional_pages = [i-1 for i in additional_pages] #take the index offset into account
-            all_pages = combine_pages(region, additional_pages)
+            Parameters.set_all_pages(combine_pages(region, additional_pages))
         except: #otherwise do this
-            all_pages = list(extra_pages_set) #contains the index for all the selected pages 
-            all_pages.sort()
-            all_pages = [i-1 for i in all_pages]
-        make_pdf(all_pages)
+            additional_pages.sort() 
+            Parameters.set_all_pages(additional_pages) #contains the index for all the selected pages 
+        make_pdf(Parameters.all_pages)
     elif filled_pages and filled_file:
         label_export.config(text="Please select a folder", fg="#C23033")
     elif filled_pages and filled_folder:
@@ -248,26 +275,22 @@ def export():
         label_export.config(text="Please select a folder and some pages", fg="#C23033")
     else:
         label_export.config(text="Please select some parameters", fg="#C23033")
-    
-
      
 window = Tk()
 window.title("PDF page selector")
 window.geometry("700x387")
 window.minsize(700, 387)
 window.maxsize(700, 500)
+
 try:
     window.iconbitmap("E:/Downloads/maya.ico")
 except:
     pass
-window.directory = ""
-window.filename = ""
 
 #labels
 
 label_freespace = Label(window)
 label_freespace.grid(row=1)
-
 
 label_freespace1 = Label(window).grid(row=8, column=0)
 
@@ -276,7 +299,8 @@ label_freespace2 = Label(window).grid(row=5, column=0)
 label_pdf = Label(window, padx = 10, text="Select an input file:")
 label_pdf.grid(row=2, column=0)
 
-label_pages = Label(window, padx=0)
+label_pages = Label(window, width=22)
+label_pages.grid(row=2, column=5, columnspan=2)
 
 label_output_folder = Label(window, padx = 10, pady=10, text="Select output folder:")
 label_output_folder.grid(row=4, column=0)
@@ -336,20 +360,19 @@ button_export = Button(window, text="Export", font="Lucida 14",width=15, padx=10
 button_export.grid(row=13, column=1, columnspan=4, rowspan=1)
 
 #text boxes
-lwr = StringVar()
-lwr.trace_add("write", lower_callback)
-entry_lower = Entry(width=8, justify='center', font=('Arial 13'), textvariable=lwr)
+lower_text = StringVar()
+lower_text.trace_add("write", lower_callback)
+entry_lower = Entry(width=8, justify='center', font=('Arial 13'), textvariable=lower_text)
 entry_lower.grid(row=7, column=1, columnspan=1)
 
-
-upr = StringVar()
-upr.trace_add("write", upper_callback)
-entry_upper = Entry(width=8, justify='center', font=('Arial 13'), textvariable=upr)
+upper_text = StringVar()
+upper_text.trace_add("write", upper_callback)
+entry_upper = Entry(width=8, justify='center', font=('Arial 13'), textvariable=upper_text)
 entry_upper.grid(row=7, column=2, columnspan=1)
 
-extr = StringVar()
-extr.trace_add("write", extra_callback)
-entry_extra_pages = Entry(window, width=8, justify='center', font=('Arial 13'), textvariable=extr)
+extra_text = StringVar()
+extra_text.trace_add("write", extra_callback)
+entry_extra_pages = Entry(window, width=8, justify='center', font=('Arial 13'), textvariable=extra_text)
 entry_extra_pages.bind('<Return>', pageadd) #bind the enter key to call pageadd
 entry_extra_pages.grid(row=9, column=1, columnspan=1)
 
